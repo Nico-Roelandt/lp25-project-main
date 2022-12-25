@@ -12,6 +12,8 @@
 #include <stddef.h>
 #include <bits/types/sig_atomic_t.h>
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
 
 #include "utility.h"
 #include "analysis.h"
@@ -21,7 +23,24 @@
  * @return the file descriptor of the message queue
  */
 int make_message_queue() {
+     key_t key;
+  int message_queue_id;
+
+  // Generate a unique key for the message queue
+  key = ftok("/tmp", 'M');
+  if (key == -1) {
+    perror("Error generating key for message queue");
     return -1;
+  }
+
+  // Create the message queue
+  message_queue_id = msgget(key, 0666 | IPC_CREAT);
+  if (message_queue_id == -1) {
+    perror("Error creating message queue");
+    return -1;
+  }
+
+  return message_queue_id;
 }
 
 /*!
