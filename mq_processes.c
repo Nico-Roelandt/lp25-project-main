@@ -24,6 +24,12 @@ struct task {
   void (*callback)(void *arg); // Pointer to callback function
   void *arg; // Argument to pass to callback function
 };
+// Custom task argument structure
+struct task_arg {
+  char *data_source; // Data source directory
+  char *temp_files; // Temporary files directory
+  char *target_file; // Target file
+};
 
 // Structure for messages sent between parent and child processes
 struct message {
@@ -231,8 +237,34 @@ void send_task_to_mq(char data_source[], char temp_files[], char target_dir[], i
  * @param target_file the target filename
  * @param mq the MQ descriptor
  * @param worker_pid the worker's PID
- */
+ */ 
+//Alors là y'a que target file que j'ai changé par rapport a la fonction d'avant ça me parait douteux mais bon il y'a marqué qu'elle marche pareil que la fonction d'avant (mais normalement ça fonctionne comme ça je pense)
 void send_file_task_to_mq(char data_source[], char temp_files[], char target_file[], int mq, pid_t worker_pid) {
+  struct message message;
+  struct task_arg *task_arg;
+
+  // Allocate memory for the task argument
+  task_arg = malloc(sizeof(struct task_arg));
+  if (task_arg == NULL) {
+    perror("Error allocating memory for task argument");
+    return;
+  }
+
+  // Set the fields of the task argument
+  task_arg->data_source = strdup(data_source);
+  task_arg->temp_files = strdup(temp_files);
+  task_arg->target_file = strdup(target_file);
+
+  // Set the fields of the message
+  message.type = worker_pid; // Set the message type to the worker's PID
+  message.task.callback = handle_task; // Set the callback function for the task
+  message.task.arg = task_arg; // Set the task argument
+
+  // Send the message to the message queue
+  if (msgsnd(mq, &message, sizeof(struct task), 0) == -1) {
+    perror("Error sending message to message queue");
+  }
+
 }
 
 /*!
