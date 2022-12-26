@@ -14,9 +14,30 @@
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/ipc.h>
+#include <stdbool.h>
 
 #include "utility.h"
 #include "analysis.h"
+
+// Structure for tasks received from the parent process
+struct task {
+  void (*callback)(void *arg); // Pointer to callback function
+  void *arg; // Argument to pass to callback function
+};
+
+// Structure for messages sent between parent and child processes
+struct message {
+  long type; // Message type (used for message queue communication)
+  struct task task; // Task received from parent process
+};
+// Custom configuration structure (assumed to contain a processes_count field)
+struct configuration {
+  int processes_count;
+  // Other fields as needed...
+};
+
+// Type alias for the configuration structure
+typedef struct configuration configuration_t;
 
 /*!
  * @brief make_message_queue creates the message queue used for communications between parent and worker processes
@@ -47,7 +68,11 @@ int make_message_queue() {
  * @brief close_message_queue closes a message queue
  * @param mq the descriptor of the MQ to close
  */
-void close_message_queue(int mq) {
+void close_message_queue(int mq) { 
+     // Remove the message queue
+  if (msgctl(mq, IPC_RMID, NULL) == -1) {
+    perror("Error removing message queue");
+  }
 }
 
 /*!
@@ -55,12 +80,39 @@ void close_message_queue(int mq) {
  * @param mq message queue descriptor used to communicate with the parent
  */
 void child_process(int mq) {
-    // 1. Endless loop (interrupted by a task whose callback is NULL)
-    // 2. Upon reception of a task: check is not NULL
-    // 2 bis. If not NULL -> execute it and notify parent
-    // 2 ter. If NULL -> leave loop
-    // 3. Cleanup
+     struct message message;
+  bool running = true; // Flag to control the child process's loop
+
+  while (running) {
+    // Receive a task from the parent process
+    if (msgrcv(mq, &message, sizeof(struct task), 0, 0) == -1) {
+      perror("Error receiving message from message queue");
+      break;
+    }
+
+    // Check if the task's callback function is NULL
+    if (message.task.callback == NULL) {
+      running = false; // Leave the loop if the callback is NULL
+    } else {
+      // Execute the task's callback function with the given argument
+      message.task.callback(message.task.arg);
+
+      // Notify the parent process that the task has been completed
+      message.type = 1; // Set the message type to 1 for the parent process
+      if (msgsnd(mq, &message, sizeof(struct task), 0) == -1) {
+        perror("Error sending message to message queue");
+        break;
+      }
+    }
+  }
+
+  // Clean up the message queue
+  close_message_queue(mq);
 }
+
+
+
+
 
 /*!
  * @brief mq_make_processes makes a processes pool used for tasks execution
@@ -69,8 +121,38 @@ void child_process(int mq) {
  * @return a malloc'ed array with all children PIDs
  */
 pid_t *mq_make_processes(configuration_t *config, int mq) {
+     pid_t *children_pids;
+  int i;
+
+  // Allocate memory for the array of children PIDs
+  children_pids = malloc(config->processes_count * sizeof(pid_t));
+  if (children_pids == NULL) {
+    perror("Error allocating memory for children PIDs");
     return NULL;
+  }
+
+  // Fork the child processes
+  for (i = 0; i < config->processes_count; i++) {
+    pid_t child_pid = fork();
+    if (child_pid == -1) {
+      perror("Error creating child process");
+      free(children_pids);
+      return NULL;
+    }
+    if (child_pid == 0) {
+      // Child process: start handling tasks
+      child_process(mq);
+      exit(EXIT_SUCCESS);
+    } else {
+      // Parent process: store the child's PID in the array
+      children_pids[i] = child_pid;
+    }
+  }
+
+  return children_pids;
 }
+
+
 
 /*!
  * @brief close_processes commands all workers to terminate
@@ -79,7 +161,29 @@ pid_t *mq_make_processes(configuration_t *config, int mq) {
  * @param children the array of children's PIDs
  */
 void close_processes(configuration_t *config, int mq, pid_t children[]) {
+     struct message message;
+  int i;
+
+  // Send a command to each child process to terminate
+  for (i = 0; i < config->processes_count; i++) {
+    message.type = children[i]; // Set the message type to the child's PID
+    message.task.callback = NULL; // Set the callback function to NULL to signal termination
+    if (msgsnd(mq, &message, sizeof(struct task), 0) == -1) {
+      perror("Error sending message to message queue");
+      break;
+    }
+  }
+
+  // Wait for all child processes to terminate
+  for (i = 0; i < config->processes_count; i++) {
+    waitpid(children[i], NULL, 0);
+  }
+
+  // Clean up the message queue
+  close_message_queue(mq);
 }
+
+
 
 /*!
  * @brief send_task_to_mq sends a directory task to a worker through the message queue. Directory task's object is
@@ -92,7 +196,33 @@ void close_processes(configuration_t *config, int mq, pid_t children[]) {
  * @param worker_pid the worker PID
  */
 void send_task_to_mq(char data_source[], char temp_files[], char target_dir[], int mq, pid_t worker_pid) {
+     struct message message;
+  struct task_arg *task_arg;
+
+  // Allocate memory for the task argument
+  task_arg = malloc(sizeof(struct task_arg));
+  if (task_arg == NULL) {
+    perror("Error allocating memory for task argument");
+    return;
+  }
+
+  // Set the fields of the task argument
+  task_arg->data_source = strdup(data_source);
+  task_arg->temp_files = strdup(temp_files);
+  task_arg->target_dir = strdup(target_dir);
+
+  // Set the fields of the message
+  message.type = worker_pid; // Set the message type to the worker's PID
+  message.task.callback = handle_task; // Set the callback function for the task
+  message.task.arg = task_arg; // Set the task argument
+
+  // Send the message to the message queue
+  if (msgsnd(mq, &message, sizeof(struct task), 0) == -1) {
+    perror("Error sending message to message queue");
+  }
 }
+
+
 
 /*!
  * @brief send_file_task_to_mq sends a file task to a worker. It operates similarly to @see send_task_to_mq
