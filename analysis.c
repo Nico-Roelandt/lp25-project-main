@@ -29,6 +29,7 @@ void parse_dir(char *path, FILE *output_file) {
         return;
     }
     DIR *dir = opendir(path);
+    struct dirent *entry;
     if (dir == NULL) {
         printf("Erreur : le chemin ne méne à rien");
         return;
@@ -37,7 +38,6 @@ void parse_dir(char *path, FILE *output_file) {
 
     // 2. Go through all entries: if file, write it to the output file; if a dir, call parse_dir on it
 
-    struct dirent *entry;
     while ((entry = readdir(dir)) != NULL) {
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
         continue;
@@ -49,10 +49,12 @@ void parse_dir(char *path, FILE *output_file) {
         strcat(entry_path, "/");
         strcat(entry_path, entry->d_name);
 
-        if (stat(path, &sb) == 0) {
-        fprintf(output_file, "%s\n", entry_path);
+
+
+        if (entry->d_type == DT_REG) {
+            fprintf(output_file, "%s\n", entry_path);
         } else{
-            parse_dir(entry_path)
+            parse_dir(entry_path,output_file);
         }
     }
 
@@ -81,7 +83,7 @@ void clear_recipient_list(simple_recipient_t *list) {
  */
 simple_recipient_t *add_recipient_to_list(char *recipient_email, simple_recipient_t *list) {
     simple_recipient_t *new_recipient = malloc(sizeof(simple_recipient_t));
-    new_recipient->email = recipient_email;
+    strcpy(new_recipient->email,recipient_email);
     new_recipient->next = list;
     return new_recipient;
 }
@@ -194,7 +196,14 @@ void parse_file(char *filepath, char *output) {
     long email_size = ftell(email_file);
     fseek(email_file, 0, SEEK_SET);
     char *email_buffer = malloc(email_size + 1);
-    fread(email_buffer, 1, email_size, email_file);
+    size_t bytes_read = fread(email_buffer, 1, email_size, email_file);
+
+    if (bytes_read < email_size) {
+        // Il y a eu une erreur de lecture ou la fin du fichier a été atteinte
+        printf("Erreur lors de la lecture du fichier");
+        return;
+    }
+
     email_buffer[email_size] = '\0';
 
     fclose(email_file);
@@ -297,7 +306,7 @@ void process_file(task_t *task) {
         return;
     }
     file_task_t *file_task = (file_task_t *)task;
-    if (file_task->mail_directory == NULL || file_task->temporary_directory == NULL || file_task->file_name == NULL) {
+    if (file_task->temporary_directory == NULL || file_task->object_file == NULL) {
         printf("Erreur : la tache est n'as pas tous les éléments nécessaire");
         return;
     }
@@ -306,12 +315,12 @@ void process_file(task_t *task) {
 
 
     //2.1 Build the full path to the input file
-    char *input_path = malloc(strlen(file_task->mail_directory) + strlen(file_task->file_name) + 2);
-    sprintf(input_path, "%s/%s", file_task->mail_directory, file_task->file_name);
+    char *input_path = malloc(strlen(file_task->temporary_directory) + strlen(file_task->object_file) + 2);
+    sprintf(input_path, "%s/%s", file_task->temporary_directory, file_task->object_file);
 
     //2.2 Build the full path to the output file
-    char *output_path = malloc(strlen(file_task->temporary_directory) + strlen(file_task->file_name) + 2);
-    sprintf(output_path, "%s/%s", file_task->temporary_directory, file_task->file_name);
+    char *output_path = malloc(strlen(file_task->temporary_directory) + strlen(file_task->object_file) + 2);
+    sprintf(output_path, "%s/%s", file_task->temporary_directory, file_task->object_file);
 
     // 3. Call parse_file
     parse_file(input_path, output_path);

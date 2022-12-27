@@ -20,25 +20,27 @@
  * @param nb_proc the maximum number of simultaneous processes
  */
 void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_proc) { // Le but est de faire la liste de tout les fichiers
-    // 1. Check parameters OK
+    // 1. Check parameters
     if (data_source == NULL || temp_files == NULL || nb_proc == 0) {
         fprintf(stderr, "Invalid input parameters\n");
         return;
     }
-
-
+    FILE *output_file = fopen(temp_files, "w");
+    DIR *dir = opendir(data_source);
+    struct dirent *entry;
+    char *path = malloc(sizeof(data_source));
     // 2. Iterate over directories (ignore . and ..)
 
     while ((entry = readdir(dir)) != NULL) {
+        int running_processes = 0;
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
         // Construit le chemin complet de l'entrée
-        snprintf(path, sizeof(path), "%s/%s", dir_name, entry->d_name);
+        snprintf(path, sizeof(data_source), "%s/%s", temp_files, entry->d_name);
 
         if (entry->d_type == DT_DIR) {
-
             if (running_processes >= nb_proc) {
                 wait(NULL);
                 running_processes--;
@@ -49,7 +51,7 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
             int pid = fork();
             if (pid == 0) {
                 // Processus fils : appelle récursivement la fonction pour traiter le répertoire
-                list_files(path, output_file);
+                direct_fork_directories(path, temp_files, nb_proc);
                 exit(0); // Termine le processus fils
             }
         } else { 
@@ -71,70 +73,69 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
  * @param nb_proc the maximum number of simultaneous processes
  */
 void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
-
-
-// Ouvrez le fichier d'entrée en lecture
-  FILE *input_file = fopen(argv[1], "r");
-  if (input_file == NULL) {
-    perror("Error opening input file");
-    return 1;
-  }
-
-  // Créez un tableau de chaînes de caractères pour stocker les adresses email
-  char **emails = malloc(sizeof(char*));
-  int num_emails = 0;
-
-  // Parcourez chaque ligne du fichier d'entrée
-  char line[1024];
-  while (fgets(line, sizeof(line), input_file)) {
-    line[strcspn(line, "\n")] = '\0';
-
-
-    if (running_processes >= nb_proc) {
-        wait(NULL);
-        running_processes--;
+    // Ouvrez le fichier d'entrée en lecture
+    FILE *input_file = fopen(data_source, "r");
+    if (input_file == NULL) {
+        perror("Error opening input file");
+        return;
     }
-    running_processes++;
-    pid_t pid = fork();
-    if (pid == 0) {
-      // Ouvrez le fichier à analyser en lecture
-      FILE *file = fopen(line, "r");
-      if (file == NULL) {
-        perror("Error opening file");
-        return 1;
-      }
 
-      // Parcourez chaque ligne du fichier
-      char email_line[1024];
-      while (fgets(email_line, sizeof(email_line), file)) {
-        // Vérifiez si la ligne contient un des champs From, To, Cc ou Bcc
-        if (strstr(email_line, "From:") || strstr(email_line, "To:") ||
-            strstr(email_line, "Cc:") || strstr(email_line, "Bcc:")) {
-          // Utilisez strtok pour extraire les adresses email de la ligne
-          char *token = strtok(email_line, " ,\n");
-          while (token != NULL) {
-            // Allouez de la mémoire pour stocker l'adresse email
-            char *email = malloc(sizeof(char) * (strlen(token) + 1));
-            strcpy(email, token);
+    // Créez un tableau de chaînes de caractères pour stocker les adresses email
+    char **emails = malloc(sizeof(char*));
+    int num_emails = 0;
 
-            // Ajoutez l'adresse email au tableau
-            emails = realloc(emails, sizeof(char*) * (num_emails + 1));
-            emails[num_emails] = email;
-            num_emails++;
+    // Parcourez chaque ligne du fichier d'entrée
+    char line[1024];
+    int running_processes = 0;
+    while (fgets(line, sizeof(line), input_file)) {
+        line[strcspn(line, "\n")] = '\0';
 
-            token = strtok(NULL, " ,\n");
-          }
+
+        if (running_processes >= nb_proc) {
+            wait(NULL);
+            running_processes--;
         }
-      }
+        running_processes++;
+        pid_t pid = fork();
+        if (pid == 0) {
+            // Ouvrez le fichier à analyser en lecture
+            FILE *file = fopen(line, "r");
+            if (file == NULL) {
+            perror("Error opening file");
+            return;
+        }
+
+        // Parcourez chaque ligne du fichier
+        char email_line[1024];
+        while (fgets(email_line, sizeof(email_line), file)) {
+            // Vérifiez si la ligne contient un des champs From, To, Cc ou Bcc
+            if (strstr(email_line, "From:") || strstr(email_line, "To:") ||
+                strstr(email_line, "Cc:") || strstr(email_line, "Bcc:")) {
+                // Utilisez strtok pour extraire les adresses email de la ligne
+                char *token = strtok(email_line, " ,\n");
+                while (token != NULL) {
+                // Allouez de la mémoire pour stocker l'adresse email
+                char *email = malloc(sizeof(char) * (strlen(token) + 1));
+                strcpy(email, token);
+
+                // Ajoutez l'adresse email au tableau
+                emails = realloc(emails, sizeof(char*) * (num_emails + 1));
+                emails[num_emails] = email;
+                num_emails++;
+
+                token = strtok(NULL, " ,\n");
+                }
+            }
+        }
 
 
-      // Fermez le fichier
-      fclose(file);
+        // Fermez le fichier
+        fclose(file);
 
-      // Quittez le processus fils
-      exit(0);
+        // Quittez le processus fils
+        exit(0);
+        }
     }
-  }
 
     // Fermez le fichier d'entrée
     fclose(input_file);
@@ -146,10 +147,10 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
     }
 
     // Ouvrez le fichier de sortie en écriture
-    FILE *output_file = fopen(argv[2], "w");
+    FILE *output_file = fopen(temp_files, "w");
     if (output_file == NULL) {
         perror("Error opening output file");
-        return 1;
+        return;
     }
 
     // Écrivez chaque adresse email dans le fichier de sortie
@@ -166,19 +167,4 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
         free(emails[i]);
     }
     free(emails);
-
-    return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-}
-
