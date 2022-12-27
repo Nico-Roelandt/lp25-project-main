@@ -29,5 +29,5 @@ void add_recipient_to_source(sender_t *source, char *recipient_email);
 
 void files_list_reducer(char *data_source, char *temp_files, char *output_file);
 void files_reducer(char *temp_file, char *output_file);
-
+void affiche_liste(sender_t* l);
 #endif //A2022_REDUCERS_H

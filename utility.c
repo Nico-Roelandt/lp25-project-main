@@ -11,9 +11,9 @@
 
 #include <errno.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include<libgen.h>
 #include <sys/stat.h>
+#include <stdlib.h>
 
 #include "global_defs.h"
 
@@ -27,12 +27,12 @@
 char *concat_path(char *prefix, char *suffix, char *full_path) {
     if(prefix!=NULL&&suffix!=NULL){
         strcpy(full_path,prefix);
+        strcat(full_path,"/");
         strcat(full_path,suffix);
     }
     else{
         strcpy(full_path,NULL);
     }
-
 
     return full_path;
 }
@@ -45,7 +45,7 @@ char *concat_path(char *prefix, char *suffix, char *full_path) {
 bool directory_exists(char *path) {
     if (opendir(path)==NULL) // Si une
     {
-        //printf("%s ",strerror(errno))
+        //printf("%s ",strerror(errno));
         return false;
     }
     else{
@@ -82,9 +82,32 @@ bool path_to_file_exists(char *path) {
  * Use fsync and dirfd
  */
 void sync_temporary_files(char *temp_dir) {
+    DIR * directory;
+    if(directory_exists(temp_dir)){
+        directory = opendir(temp_dir);
+        dirfd(directory);
+        chdir(temp_dir);
+        struct dirent *current_entry;
+        struct stat info;
+        while ((current_entry = readdir(directory)) != NULL){
+            //stat(current_entry->d_name, &info);
+            if (strcmp(current_entry->d_name, ".") && strcmp(current_entry->d_name, "..")) {
+                //printf("%s",current_entry->d_name);
+                FILE *fd = fopen(current_entry->d_name, "r");
+                fsync(fileno(fd));
+                fclose(fd);
+            }
+        }
+        closedir( directory);
+    }
+    else{
+        printf("error");
+    }
 
 
 }
+
+
 
 /*!
  * @brief next_dir returns the next directory entry that is not . or ..
@@ -166,6 +189,13 @@ int create_directory(char*path){
 
     return 1;
 }
+
+
+
+
+
+
+
 
 
 

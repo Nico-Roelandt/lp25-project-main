@@ -24,4 +24,7 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
 void display_configuration(configuration_t *configuration);
 bool is_configuration_valid(configuration_t *configuration);
 
+char *get_word(char *source, char *target);
+char *skip_spaces(char *str);
+
 #endif //A2022_CONFIGURATION_H
