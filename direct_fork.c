@@ -21,8 +21,12 @@
  */
 void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_proc) { // Le but est de faire la liste de tout les fichiers
     // 1. Check parameters
-    if (data_source == NULL || temp_files == NULL || nb_proc == 0) {
-        fprintf(stderr, "Invalid input parameters\n");
+    if (directory_exists(data_source) != true) {
+        fprintf(stderr, "Data source n'est pas valide\n");
+        return;
+    }
+    if (directory_exists(temp_files) != true) {
+        fprintf(stderr, "Temp file n'est pas valide\n");
         return;
     }
     FILE *output_file = fopen(temp_files, "w");
@@ -30,9 +34,9 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
     struct dirent *entry;
     char *path = malloc(sizeof(data_source));
     // 2. Iterate over directories (ignore . and ..)
-
+    int running_processes = 0;
     while ((entry = readdir(dir)) != NULL) {
-        int running_processes = 0;
+        printf("Debug 2\n");
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
@@ -45,24 +49,31 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
                 wait(NULL);
                 running_processes--;
             }
-            running_processes++;
-
+            
+            printf("Debug 3\n");
             // Crée un nouveau processus pour traiter le répertoire
             int pid = fork();
-            if (pid == 0) {
+            if (pid == 0) { 
                 // Processus fils : appelle récursivement la fonction pour traiter le répertoire
-                direct_fork_directories(path, temp_files, nb_proc);
+                direct_fork_directories(data_source, temp_files, nb_proc-1);
                 exit(0); // Termine le processus fils
+            } else {
+                printf("Debug 4\n");
+                running_processes++;
             }
-        } else { 
+        } else {  
+            printf("Ajout de : %s", path);
             fprintf(output_file, "%s\n", path);
         }
-        while(running_processes != 0){
-            wait(NULL);
-            running_processes--;
-        }
+
     }
+
     // 4. Cleanup
+    while(running_processes != 0){
+        wait(NULL);
+        running_processes--;
+    }
+    printf("Debug 1.8\n");
     closedir(dir);
 }
 
