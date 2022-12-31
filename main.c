@@ -121,6 +121,7 @@ int main(int argc, char *argv[]) {
     printf("Debug 4\n");
     files_list_reducer(config.data_path, config.temporary_directory, direct_temp_result_name);
     printf("Debug 5\n");
+    return 0;
     direct_fork_files(config.data_path, config.temporary_directory, config.process_count);
     printf("Debug 6\n");
     sync_temporary_files(config.temporary_directory);

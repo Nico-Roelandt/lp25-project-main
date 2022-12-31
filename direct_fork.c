@@ -25,45 +25,57 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
         fprintf(stderr, "Data source n'est pas valide\n");
         return;
     }
-    if (directory_exists(temp_files) != true) {
-        fprintf(stderr, "Temp file n'est pas valide\n");
-        return;
-    }
-    FILE *output_file = fopen(temp_files, "w");
+
+
     DIR *dir = opendir(data_source);
     struct dirent *entry;
-    char *path = malloc(sizeof(data_source));
+    char *temp_path = malloc(sizeof(temp_files)+sizeof(entry->d_name));
+    char *source_path = malloc(sizeof(temp_files)+sizeof(entry->d_name));
     // 2. Iterate over directories (ignore . and ..)
     int running_processes = 0;
     while ((entry = readdir(dir)) != NULL) {
-        printf("Debug 2\n");
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
 
-        // Construit le chemin complet de l'entrée
-        snprintf(path, sizeof(data_source), "%s/%s", temp_files, entry->d_name);
+        int size = strlen(entry->d_name);
+        concat_path(data_source, entry->d_name, source_path);
 
-        if (entry->d_type == DT_DIR) {
+        if (entry->d_type == DT_DIR && entry->d_name[size - 2] == '-') {
+
+        
+
+
+
             if (running_processes >= nb_proc) {
                 wait(NULL);
                 running_processes--;
             }
             
-            printf("Debug 3\n");
             // Crée un nouveau processus pour traiter le répertoire
             int pid = fork();
             if (pid == 0) { 
                 // Processus fils : appelle récursivement la fonction pour traiter le répertoire
-                direct_fork_directories(data_source, temp_files, nb_proc-1);
+                direct_fork_directories(source_path, concat_path(temp_files, entry->d_name, temp_path), nb_proc-1);
                 exit(0); // Termine le processus fils
             } else {
-                printf("Debug 4\n");
                 running_processes++;
             }
-        } else {  
-            printf("Ajout de : %s", path);
-            fprintf(output_file, "%s\n", path);
+        } else { 
+            if(entry->d_type == DT_DIR){
+                int pid = fork();
+                if (pid == 0) { 
+                    // Processus fils : appelle récursivement la fonction pour traiter le répertoire
+                    direct_fork_directories(source_path, temp_files, nb_proc-1);
+                    exit(0); // Termine le processus fils
+                } else {
+                    running_processes++;
+                }
+            } else {
+                FILE *output_file = fopen(temp_files, "a");
+                fprintf(output_file, "%s\n", source_path);
+                fclose(output_file);
+            }
         }
 
     }
@@ -73,7 +85,6 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
         wait(NULL);
         running_processes--;
     }
-    printf("Debug 1.8\n");
     closedir(dir);
 }
 
