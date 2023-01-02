@@ -43,16 +43,21 @@ char *concat_path(char *prefix, char *suffix, char *full_path) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path) {
-    if (opendir(path)==NULL) // Si une
+    DIR *dp;
+    dp=opendir(path);
+    if (dp==NULL) // Si on ne peut pas acceder au repertoire
     {
         //printf("%s ",strerror(errno));
+
         return false;
     }
     else{
+        closedir(dp); // Si on peut acceder au repertoire, on le ferme apres
         //printf("exte %s",path);
+
         return true;
     }
-    return false;
+
 }
 
 /*!
@@ -63,12 +68,12 @@ bool directory_exists(char *path) {
  * @return true if path to file exists, false else
  */
 bool path_to_file_exists(char *path) {
-    FILE *f=fopen(path, "a+");
+    FILE *f=fopen(path, "r");
     if(f==NULL){
         //printf("%s ",strerror(errno));
         return false;
     }else{
-
+        fclose(f);
         //printf("chemin trouve");
         return true;
 
@@ -88,9 +93,7 @@ void sync_temporary_files(char *temp_dir) {
         dirfd(directory);
         chdir(temp_dir);
         struct dirent *current_entry;
-        struct stat info;
         while ((current_entry = readdir(directory)) != NULL){
-            //stat(current_entry->d_name, &info);
             if (strcmp(current_entry->d_name, ".") && strcmp(current_entry->d_name, "..")) {
                 //printf("%s",current_entry->d_name);
                 FILE *fd = fopen(current_entry->d_name, "r");

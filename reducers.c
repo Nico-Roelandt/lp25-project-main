@@ -167,8 +167,8 @@ void files_list_reducer(char *data_source, char *temp_files, char *output_file) 
     noms_utilisateurs=malloc(150*sizeof(char*));
     DIR *dir;
     int it=0;
-    if(directory_exists(data_source)==true&&directory_exists(temp_files)==true){
-
+    if(directory_exists(data_source)==true&&directory_exists(temp_files)==true){ //On teste l'existance des repertoires
+        //On stocke les noms des utilisateurs du repertoire
         dir=opendir(data_source);
         struct dirent *current_entry;
         while ((current_entry = readdir(dir)) != NULL){
@@ -182,32 +182,44 @@ void files_list_reducer(char *data_source, char *temp_files, char *output_file) 
                 it++;
             }
         }
+        //printf("%d",it);
 
 
-        for(int i=0;i<150;i++){
-            //puts(noms_utilisateurs[i]);
-            free(noms_utilisateurs[i]);
-        }
 
         strcpy(last_dir, basename(output_file));
-        int i=0;
         stat_change_directory=chdir(temp_files);
+        //On ouvre le fichier resultat
+        FILE *file_output = fopen(last_dir, "a+");
         if(stat_change_directory==0){ //Change of direcctory succesful
+            //On ouvre chaque fichier "utilisateur"
+            for(int i=0;i<it;i++){
+                FILE *f = fopen(noms_utilisateurs[i], "r");
+                if(f!=NULL){
+                    //On parcours ligne par ligne et on la copie dans le fichier resultar
+                    while (fgets(string, STR_MAX_LEN, f)) {
+                        fprintf( file_output, "%s",string );
+                    }
+                    fclose(f);
+                }
+            }
+            fclose(file_output);
+
+
+
         }else{
             //printf("erreur");
         }
 
 
-        //for(int i=0;i<1;i++){
-        //if(path_to_file_exists(noms_utilisateurs[i])){}
-        FILE *f = fopen("ermis-f", "r");
-        while (fgets(string, STR_MAX_LEN, f)) {
-            FILE *file_output = fopen(last_dir, "a+");
-            fprintf( file_output, "%s",string );
-            fclose(file_output);
+
+
+        for(int i=0;i<it;i++){
+            //puts(noms_utilisateurs[i]);
+            free(noms_utilisateurs[i]);
         }
-        fclose(f);
+
         free(noms_utilisateurs);
+
     }
     else{
         //printf("problem");
@@ -269,17 +281,17 @@ void files_reducer(char *temp_file, char *output_file) {
         int stat_change_directory=chdir(parent_dir);
         if(stat_change_directory==0){ //Change of direcctory succesful
             sender_t* p=list_of_source_emails;
-            while (p!=NULL){
-                FILE *file_output = fopen(fichier_resultat, "a+");
+            while (p!=NULL){ // On parcours la liste
+                FILE *file_output = fopen(fichier_resultat, "a+");// on ouvre le fichier resultat pour copier la liste des sources avec destinataire
                 fprintf(file_output,"%s ", p->recipient_address);
                 recipient_t* current_recipient=p->head;
-                while(current_recipient!=NULL){
+                while(current_recipient!=NULL){  // Tant qu'il aient des  recipients, on les imprime
                     fprintf(file_output,"(%d) %s ", current_recipient->occurrences,current_recipient->recipient_address);
                     current_recipient=current_recipient->next;
                 }
                 fprintf(file_output,"\n");
                 p=p->next;
-                fclose(file_output);
+                fclose(file_output);// A chaque fois on ferme le fichier resultat
             }
         }
     }
