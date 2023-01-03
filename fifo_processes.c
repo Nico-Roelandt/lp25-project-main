@@ -22,11 +22,6 @@
 #include "analysis.h"
 #include "utility.h"
 
-/*!
- * @brief make_fifos creates FIFOs for processes to communicate with their parent
- * @param processes_count the number of FIFOs to create
- * @param file_format the filename format, e.g. fifo-out-%d, used to name the FIFOs
- */
 void make_fifos(uint16_t processes_count, char *file_format) {
 
     for (int i = 0; i < processes_count; i++) {
@@ -39,11 +34,6 @@ void make_fifos(uint16_t processes_count, char *file_format) {
     }
 }
 
-/*!
- * @brief erase_fifos erases FIFOs used for processes communications with the parent
- * @param processes_count the number of FIFOs to destroy
- * @param file_format the filename format, e.g. fifo-out-%d, used to name the FIFOs
- */
 void erase_fifos(uint16_t processes_count, char *file_format) {
     for (int i = 0; i < processes_count; i++) {
         char fifo_name[256];
@@ -55,27 +45,30 @@ void erase_fifos(uint16_t processes_count, char *file_format) {
     }
 }
 
-/*!
- * @brief make_processes creates processes and starts their code (waiting for commands)
- * @param processes_count the number of processes to create
- * @return a malloc'ed array with the PIDs of the created processes
- */
 pid_t *make_processes(uint16_t processes_count) {
-    // 1. Create PIDs array
-    // 2. Loop over processes_count to fork
-    // 2 bis. in fork child part, open reading and writing FIFOs, and start listening on reading FIFO
-    // 3. Upon reception, apply task
-    // 3 bis. If task has a NULL callback, terminate process (don't forget cleanup).
-    return NULL;
+    pid_t *pids = malloc(processes_count * sizeof(pid_t));
+    if (pids == NULL) {
+        perror("malloc failed");
+        return NULL;
+    }
+
+    for (int i = 0; i < processes_count; i++) {
+        pid_t pid = fork();
+        if (pid == -1) {
+            perror("fork failed");
+            free(pids);
+            return NULL;
+        }
+        if (pid == 0) {
+            exit(EXIT_SUCCESS);
+        } else {
+            pids[i] = pid;
+        }
+    }
+
+    return pids;
 }
 
-/*!
- * @brief open_fifos opens FIFO from the parent's side
- * @param processes_count the number of FIFOs to open (must be created before)
- * @param file_format the name pattern of the FIFOs
- * @param flags the opening mode for the FIFOs
- * @return a malloc'ed array of opened FIFOs file descriptors
- */
 int *open_fifos(uint16_t processes_count, char *file_format, int flags) {
     int* fds = malloc(processes_count * sizeof(int));
     if (fds == NULL) {
@@ -96,11 +89,7 @@ int *open_fifos(uint16_t processes_count, char *file_format, int flags) {
     return fds;
 }
 
-/*!
- * @brief close_fifos closes FIFOs opened by the parent
- * @param processes_count the number of FIFOs to close
- * @param files the array of opened FIFOs as file descriptors
- */
+
 void close_fifos(uint16_t processes_count, int *files) {
     for (int i = 0; i < processes_count; i++) {
         if (close(files[i]) < 0) {
@@ -110,11 +99,7 @@ void close_fifos(uint16_t processes_count, int *files) {
     }
 }
 
-/*!
- * @brief shutdown_processes terminates all worker processes by sending a task with a NULL callback
- * @param processes_count the number of processes to terminate
- * @param fifos the array to the output FIFOs (used to command the processes) file descriptors
- */
+
 void shutdown_processes(uint16_t processes_count, int *fifos) {
     char task[256];
     memset(task, 0, sizeof(task));
@@ -128,13 +113,7 @@ void shutdown_processes(uint16_t processes_count, int *fifos) {
 
 }
 
-/*!
- * @brief prepare_select prepares fd_set for select with all file descriptors to look at
- * @param fds the fd_set to initialize
- * @param filesdes the array of file descriptors
- * @param nb_proc the number of processes (elements in the array)
- * @return the maximum file descriptor value (as used in select)
- */
+
 int prepare_select(fd_set *fds, const int *filesdes, uint16_t nb_proc) {
     FD_ZERO(fds); // Initialize the fd_set to have no file descriptors set
 
@@ -148,14 +127,7 @@ int prepare_select(fd_set *fds, const int *filesdes, uint16_t nb_proc) {
     return max_fd;
 }
 
-/*!
- * @brief send_task sends a directory task to a child process. Must send a directory command on object directory
- * data_source/dir_name, to write the result in temp_files/dir_name. Sends on FIFO with FD command_fd
- * @param data_source the data source with directories to analyze
- * @param temp_files the temporary output files directory
- * @param dir_name the current dir name to analyze
- * @param command_fd the child process command FIFO file descriptor
- */
+
 void send_task(char *data_source, char *temp_files, char *dir_name, int command_fd) {
 
         char command[1024];
@@ -165,15 +137,7 @@ void send_task(char *data_source, char *temp_files, char *dir_name, int command_
 
     }
 
-/*!
- * @brief fifo_process_directory is the main function to distribute directory analysis to worker processes.
- * @param data_source the data source with the directories to analyze
- * @param temp_files the temporary files directory
- * @param notify_fifos the FIFOs on which to read for workers to notify end of tasks
- * @param command_fifos the FIFOs on which to send tasks to workers
- * @param nb_proc the maximum number of simultaneous tasks, = to number of workers
- * Uses @see send_task
- */
+
 void fifo_process_directory(char *data_source, char *temp_files, int *notify_fifos, int *command_fifos, uint16_t nb_proc) {
     if (data_source == NULL || temp_files == NULL || notify_fifos == NULL || command_fifos == NULL || nb_proc == 0) {
         fprintf(stderr, "Invalid parameters\n");
@@ -212,14 +176,6 @@ void fifo_process_directory(char *data_source, char *temp_files, int *notify_fif
 }
 
 
-/*!
- * @brief fifo_process_files is the main function to distribute files analysis to worker processes.
- * @param data_source the data source with the files to analyze
- * @param temp_files the temporary files directory (step1_output is here)
- * @param notify_fifos the FIFOs on which to read for workers to notify end of tasks
- * @param command_fifos the FIFOs on which to send tasks to workers
- * @param nb_proc  the maximum number of simultaneous tasks, = to number of workers
- */
 void fifo_process_files(char *data_source, char *temp_files, int *notify_fifos, int *command_fifos, uint16_t nb_proc) {
     if (data_source == NULL || temp_files == NULL || notify_fifos == NULL || command_fifos == NULL || nb_proc == 0) {
         fprintf(stderr, "Invalid parameters\n");

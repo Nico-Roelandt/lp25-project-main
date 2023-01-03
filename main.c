@@ -21,8 +21,8 @@
 #include <dirent.h>
 
 // Choose a method below by uncommenting ONLY one of the following 3 lines:
-#define METHOD_MQ
-//#define METHOD_DIRECT
+//#define METHOD_MQ
+#define METHOD_DIRECT
 //#define METHOD_FIFO
 
 #ifdef METHOD_MQ
@@ -110,15 +110,26 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef METHOD_DIRECT
+    printf("Debug\n");
     direct_fork_directories(config.data_path, config.temporary_directory, config.process_count);
+    printf("Debug 1\n");
     sync_temporary_files(config.temporary_directory);
+    printf("Debug 2\n");
     char direct_temp_result_name[STR_MAX_LEN];
+    printf("Debug 3\n");
     concat_path(config.temporary_directory, "step1_output", direct_temp_result_name);
+    printf("Debug 4\n");
     files_list_reducer(config.data_path, config.temporary_directory, direct_temp_result_name);
+    printf("Debug 5\n");
+    return 0;
     direct_fork_files(config.data_path, config.temporary_directory, config.process_count);
+    printf("Debug 6\n");
     sync_temporary_files(config.temporary_directory);
+    printf("Debug 7\n");
     char direct_step2_file[STR_MAX_LEN];
+    printf("Debug 8\n");
     concat_path(config.temporary_directory, "step2_output", direct_step2_file);
+    printf("Debug 9\n");
     files_reducer(direct_step2_file, config.output_file);
 #endif
 
