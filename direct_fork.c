@@ -96,69 +96,90 @@ void direct_fork_directories(char *data_source, char *temp_files, uint16_t nb_pr
  */
 void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
     // Ouvrez le fichier d'entrée en lecture
-    FILE *input_file = fopen(data_source, "r");
+    char* temp[12];
+    char *temp_path = malloc(sizeof(temp_files) + sizeof(temp));
+    char *source_path = malloc(sizeof(temp_files) + sizeof(temp)); // Ici on agrandit la taille du malloc pour pouvoir ajouter "step1_output"
+    
+    concat_path(temp_files,"step1_output",source_path);
+    //Ouverture de step1_output
+    FILE *input_file = fopen(source_path, "r");
     if (input_file == NULL) {
-        perror("Error opening input file");
+        printf("Error opening input file 1");
         return;
     }
 
-    // Créez un tableau de chaînes de caractères pour stocker les adresses email
-    char **emails = malloc(sizeof(char*));
-    int num_emails = 0;
+    concat_path(temp_files,"step2_output",temp_path);
+    // Ouvrez le fichier de sortie en écriture
+    FILE *output_file = fopen(temp_path, "w");
+    if (output_file == NULL) {
+        perror("Error opening output file 2\n");
+        return;
+    }
 
+    printf("Fichier out : %s\n", temp_path);
     // Parcourez chaque ligne du fichier d'entrée
-    char line[1024];
+    char line[5000];
     int running_processes = 0;
     while (fgets(line, sizeof(line), input_file)) {
         line[strcspn(line, "\n")] = '\0';
-
 
         if (running_processes >= nb_proc) {
             wait(NULL);
             running_processes--;
         }
         running_processes++;
+
         pid_t pid = fork();
         if (pid == 0) {
             // Ouvrez le fichier à analyser en lecture
             FILE *file = fopen(line, "r");
             if (file == NULL) {
-            perror("Error opening file");
-            return;
-        }
+            //    printf("Error opening file :%s\n",line);
+                exit(0);
+            }
+            // Parcourez chaque ligne du fichier
+            char email_line[1024];
+            while (fgets(email_line, sizeof(email_line), file)) {
+                // Vérifiez si la ligne contient un des champs From, To, Cc ou Bcc
+                if (strstr(email_line, "From:") || strstr(email_line, "To:") || strstr(email_line, "Cc:") || strstr(email_line, "Bcc:")) {
+                    char *email_start = strstr(email_line, " ") + 1;
+                    int stop = 0;
+                    while (stop != 1) {
+                        // a partir du début de l'adresse mail on va jusqu'au .com
+                        char *email_end = strstr(email_start, ",");
+                        if (email_end == NULL) {
+                            // This is the last email in the buffer, set end to the end of the buffer
+                            email_end = strstr(email_start, ".com");
+                            email_end = email_end + 4;
+                            stop = 1;
+                        }
 
-        // Parcourez chaque ligne du fichier
-        char email_line[1024];
-        while (fgets(email_line, sizeof(email_line), file)) {
-            // Vérifiez si la ligne contient un des champs From, To, Cc ou Bcc
-            if (strstr(email_line, "From:") || strstr(email_line, "To:") ||
-                strstr(email_line, "Cc:") || strstr(email_line, "Bcc:")) {
-                // Utilisez strtok pour extraire les adresses email de la ligne
-                char *token = strtok(email_line, " ,\n");
-                while (token != NULL) {
-                // Allouez de la mémoire pour stocker l'adresse email
-                char *email = malloc(sizeof(char) * (strlen(token) + 1));
-                strcpy(email, token);
+                        // Ici on prend les positions de début et de fin en ce qui est entre les deux est l'adresse mail
+                        int email_length = email_end - email_start;
+                        
+                        if(strstr(email_start, "@")){
+                            if(!strstr(email_start, " ") && !strstr(email_start, "/")){
+                                char *email = malloc(email_length - 1);
+                                memcpy(email, email_start, email_length);
+                                printf("%s : %d : %d\n", email, email_length, stop);
+                                fprintf(output_file, "%s\n", email);
+                                //Écrivez chaque adresse email dans le fichier de sortie
+                            }
+                        }
+                        email_start = email_end + 1;
+                    }
 
-                // Ajoutez l'adresse email au tableau
-                emails = realloc(emails, sizeof(char*) * (num_emails + 1));
-                emails[num_emails] = email;
-                num_emails++;
-
-                token = strtok(NULL, " ,\n");
                 }
             }
-        }
 
+            // Fermez le fichier
+            fclose(file);
 
-        // Fermez le fichier
-        fclose(file);
-
-        // Quittez le processus fils
-        exit(0);
+            // Quittez le processus fils
+            exit(0);
         }
     }
-
+    printf("FIN");
     // Fermez le fichier d'entrée
     fclose(input_file);
 
@@ -168,25 +189,7 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
         running_processes--;
     }
 
-    // Ouvrez le fichier de sortie en écriture
-    FILE *output_file = fopen(temp_files, "w");
-    if (output_file == NULL) {
-        perror("Error opening output file");
-        return;
-    }
-
-    // Écrivez chaque adresse email dans le fichier de sortie
-    for (int i = 0; i < num_emails; i++) {
-        fputs(emails[i], output_file);
-        fputs("\n", output_file);
-    }
-
     // Fermez le fichier de sortie
     fclose(output_file);
-
-    // Libérez la mémoire utilisée par le tableau d'adresses email
-    for (int i = 0; i < num_emails; i++) {
-        free(emails[i]);
-    }
-    free(emails);
+    return;
 }
