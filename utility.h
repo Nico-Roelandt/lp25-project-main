@@ -13,5 +13,6 @@ bool directory_exists(char *path);
 bool path_to_file_exists(char *path);
 void sync_temporary_files(char *temp_dir);
 struct dirent *next_dir(struct dirent *entry, DIR *dir);
+int create_directory(char*path);
 
 #endif //A2022_UTILITY_H

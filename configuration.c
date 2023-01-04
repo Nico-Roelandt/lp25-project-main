@@ -54,7 +54,10 @@ configuration_t *make_configuration(configuration_t *base_configuration, char *a
                     if( path_to_file_exists(optarg)==true){
                         strcpy(base_configuration->output_file,optarg);
                     }else{
-                        base_configuration=NULL;
+                        FILE *f=fopen(optarg, "a+"); // Si le chemin n'existe pas on le cree
+                        fclose(f);
+                        strcpy(base_configuration->output_file,optarg);
+
                     }
                     break;
                 }
@@ -190,7 +193,7 @@ configuration_t *make_configuration(configuration_t *base_configuration, char *a
  */
 char *skip_spaces(char *str) {
     int i=0;
-    while(str[i]==' '&& str[i]!='\0'){
+    while(str[i]==' '){
         i++;
     }
     str=&str[i];
@@ -212,6 +215,7 @@ char *check_equal(char *str) {
         str=skip_spaces(str);
     }
 
+    //if(skip_spaces)
     while(str[i]!='='&& str[i]!='\0'){ //looks for an equal '=' sign
         i++;
     }
@@ -278,7 +282,7 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
     char string[STR_MAX_LEN];
     char *source;
     char extract_string[STR_MAX_LEN];
-    if(path_to_file_exists(path_to_cfg_file)==true) {
+    if(path_to_file_exists(path_to_cfg_file)==true) { //On teste si le chemin au fichier de configuration existe
 
         FILE *f = fopen(path_to_cfg_file, "r");
         while (fgets(string, STR_MAX_LEN, f)) {
@@ -328,7 +332,6 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
                     base_configuration=NULL;
                 }
             }
-
             if(strncmp(string,"temporary_directory",strlen("temporary_directory"))==0){ //Parametrage temporary directory
                 source=check_equal(string);
                 if(source!=0){
@@ -352,10 +355,6 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
                     base_configuration=NULL;
                 }
             }
-
-
-
-
             if(strncmp(string,"output_file",strlen("output_file"))==0){ //Parametrage output file
                 source=check_equal(string);
                 if(source!=0){
@@ -363,7 +362,9 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
                     if( path_to_file_exists(extract_string)==true){
                         strcpy(base_configuration->output_file,extract_string);
                     }else{
-                        base_configuration=NULL;
+                        FILE *f=fopen(extract_string, "a+"); // Si le chemin n'existe pas on le cree
+                        fclose(f);
+                        strcpy(base_configuration->output_file,extract_string);
                     }
 
                 }else{
@@ -380,8 +381,6 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
                 }
 
             }
-
-
             memset(extract_string,'\0',STR_MAX_LEN);
             memset(string,'\0',STR_MAX_LEN);
         }
@@ -417,10 +416,15 @@ void display_configuration(configuration_t *configuration) {
  * @return true if configuration is valid, false else
  */
 bool is_configuration_valid(configuration_t *configuration) {
-    if(configuration==NULL){
-        return false;
-    }else{
+    if(configuration->cpu_core_multiplier!=0&&
+       directory_exists(configuration->data_path)==true&&
+       path_to_file_exists(configuration->output_file)==true&&(
+               configuration->is_verbose==true||configuration->is_verbose==false)&&
+       directory_exists(configuration->temporary_directory)==true)
+    {
         return true;
+    }else{
+        return false;
     }
 }
 
