@@ -157,18 +157,13 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
                         int email_length = email_end - email_start;
                         
                         if(strstr(email_start, "@")){
+                            char* email = malloc(sizeof(char*) * email_length);
                             if(!strstr(email_start, " ") && !strstr(email_start, "/")){
-                                char *email = malloc(email_length - 1);
-                                memcpy(email, email_start, email_length);
+                                memcpy(email, email_start, email_length * sizeof(char));
                                 fprintf(output_file, "%s ", email);
                                 //Écrivez chaque adresse email dans le fichier de sortie
                             }
                         }
-
-
-
-                        
-
 
 
                         email_start = email_end + 1;
