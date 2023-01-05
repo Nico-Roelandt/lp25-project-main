@@ -116,7 +116,6 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
         return;
     }
 
-    printf("Fichier out : %s\n", temp_path);
     // Parcourez chaque ligne du fichier d'entrée
     char line[5000];
     int running_processes = 0;
@@ -161,17 +160,23 @@ void direct_fork_files(char *data_source, char *temp_files, uint16_t nb_proc) {
                             if(!strstr(email_start, " ") && !strstr(email_start, "/")){
                                 char *email = malloc(email_length - 1);
                                 memcpy(email, email_start, email_length);
-                                printf("%s : %d : %d\n", email, email_length, stop);
-                                fprintf(output_file, "%s\n", email);
+                                fprintf(output_file, "%s ", email);
                                 //Écrivez chaque adresse email dans le fichier de sortie
                             }
                         }
+
+
+
+                        
+
+
+
                         email_start = email_end + 1;
                     }
 
                 }
             }
-
+            fprintf(output_file, "\n");
             // Fermez le fichier
             fclose(file);
 

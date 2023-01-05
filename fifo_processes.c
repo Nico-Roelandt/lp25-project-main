@@ -1,6 +1,3 @@
-//
-// Created by flassabe on 27/10/22.
-//
 
 #include "fifo_processes.h"
 
@@ -17,21 +14,12 @@
 #include "unistd.h"
 #include "stdlib.h"
 #include "sys/types.h"
-#include "winsock.h"
+//#include "winsock.h"
 
 #include "analysis.h"
 #include "utility.h"
 
 void make_fifos(uint16_t processes_count, char *file_format) {
-
-    for (int i = 0; i < processes_count; i++) {
-        char fifo_name[256];
-        sprintf(fifo_name, file_format, i);
-        if (mkfifo(fifo_name, 0666) < 0) {
-            perror("mkfifo");
-            exit(EXIT_FAILURE);
-        }
-    }
 }
 
 void erase_fifos(uint16_t processes_count, char *file_format) {
@@ -115,9 +103,9 @@ void shutdown_processes(uint16_t processes_count, int *fifos) {
 
 
 int prepare_select(fd_set *fds, const int *filesdes, uint16_t nb_proc) {
-    FD_ZERO(fds); // Initialize the fd_set to have no file descriptors set
+    FD_ZERO(fds);// Initialize the fd_set to have no file descriptors set
 
-    // Set all file descriptors in the fd_set
+    //Set all file descriptors in the fd_set
     int max_fd = 0;
     for (int i = 0; i < nb_proc; i++) {
         FD_SET(filesdes[i], fds);
