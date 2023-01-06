@@ -276,11 +276,22 @@ void send_file_task_to_mq(char data_source[], char temp_files[], char target_fil
  * @param children the children's PIDs used as MQ topics number
  */
 void mq_process_directory(configuration_t *config, int mq, pid_t children[]) {
-    // 1. Check parameters
+     // 1. Check parameters
+    if (config == NULL || mq < 0 || children == NULL) {
+        fprintf(stderr, "Error: invalid parameters in mq_process_directory\n");
+        return;
+    }
+
     // 2. Iterate over children and provide one directory to each
+    int i;
+    for (i = 0; i < config->nb_children; i++) {
+        send_directory_task_to_mq(config->data_sources[i], config->temp_files[i], config->target_dirs[i], mq, children[i]);
+    }
+
     // 3. Loop while there are directories to process, and while all workers are processing
-    // 3 bis. For each worker finishing its task: send a new one if any task is left, keep track of running workers else
-    // 4. Cleanup
+    int nb_tasks_left = config->nb_children;
+    int nb_workers_running = config->nb_children;
+  //didint success and idk how to continue 
 }
 
 /*!
