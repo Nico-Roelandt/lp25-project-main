@@ -31,7 +31,7 @@ char *concat_path(char *prefix, char *suffix, char *full_path) {
         strcat(full_path,suffix);
     }
     else{
-        strcpy(full_path,NULL);
+        return NULL;
     }
 
     return full_path;
@@ -43,6 +43,8 @@ char *concat_path(char *prefix, char *suffix, char *full_path) {
  * @return true if directory exists, false else
  */
 bool directory_exists(char *path) {
+
+
     DIR *dp;
     dp=opendir(path);
     if (dp==NULL) // Si on ne peut pas acceder au repertoire
@@ -68,17 +70,38 @@ bool directory_exists(char *path) {
  * @return true if path to file exists, false else
  */
 bool path_to_file_exists(char *path) {
-    FILE *f=fopen(path, "r");
-    if(f==NULL){
-        //printf("%s ",strerror(errno));
-        return false;
-    }else{
-        fclose(f);
-        //printf("chemin trouve");
-        return true;
+    int lg_lastdir,lg_parentdir;
+    size_t lg_path;
 
+    char *last_dir=malloc(sizeof(char)*STR_MAX_LEN);
+    char *parent_dir=malloc(sizeof(char)*STR_MAX_LEN);
+
+    strcpy(last_dir, basename(path));   // On extrait le nom du du fichier
+    lg_lastdir=strlen(last_dir);
+    lg_path=strlen(path);
+    lg_parentdir=lg_path-lg_lastdir-1;
+    strncpy(parent_dir, path,lg_parentdir); // On extrait le chemin du repertoire parent
+
+    if(directory_exists(parent_dir)==true){
+        //printf("dir exists");
+        free(parent_dir);
+        free(last_dir);
+        FILE *f=fopen(path, "r");
+        if(f==NULL){
+            //printf("%s ",strerror(errno));
+            return false;
+        }else{
+            fclose(f);
+            //printf("chemin trouve");
+            return true;
+        }
     }
-    return false;
+    else{
+        free(parent_dir);
+        free(last_dir);
+        return false;
+    }
+
 }
 
 /*!
@@ -88,23 +111,24 @@ bool path_to_file_exists(char *path) {
  */
 void sync_temporary_files(char *temp_dir) {
     DIR * directory;
-    if(directory_exists(temp_dir)){
+    if(directory_exists(temp_dir)==true){ //On teste si le repertoire existe
         directory = opendir(temp_dir);
-        dirfd(directory);
+        fsync(dirfd(directory)); //On met à jour le repertoire
         chdir(temp_dir);
+
         struct dirent *current_entry;
         while ((current_entry = readdir(directory)) != NULL){
             if (strcmp(current_entry->d_name, ".") && strcmp(current_entry->d_name, "..")) {
                 //printf("%s",current_entry->d_name);
                 FILE *fd = fopen(current_entry->d_name, "r");
-                fsync(fileno(fd));
+                fsync(fileno(fd)); //On met a jour chaque fichier du repertoire
                 fclose(fd);
             }
         }
         closedir( directory);
     }
     else{
-        printf("error");
+        printf("Synchronisation echoue\n");
     }
 
 
@@ -119,29 +143,19 @@ void sync_temporary_files(char *temp_dir) {
  * @return a pointer to the next not . or .. directory, NULL if none remain
  */
 struct dirent *next_dir(struct dirent *entry, DIR *dir) { //PAS ENCORE FINIE
-    int stat_change_directory=-1;
     int test_first_dir=0;
-    //char path[STR_MAX_LEN];
-    char *path=(char*)malloc(STR_MAX_LEN*sizeof(char));
 
-    if (!dir) {
-        printf("is not a valid path\n");
 
-    } else {
+    if (!dir) { //Si le repertoire n'est pas valide
+        //printf("is not a valid path\n");
+
+    } else { //Si le repertoire n'est pas valide
         while ((entry = readdir(dir)) != NULL&&test_first_dir==0){
-
             struct stat info;
             stat(entry->d_name, &info);
+            // on teste si il s'agit d'un repertoire autre que "." et ".."
             if (strcmp(entry->d_name, ".") && strcmp(entry->d_name, "..")&&S_ISDIR(info.st_mode)) {
-                printf("%s is a directory\n", entry->d_name);
-                //realpath(entry->d_name, path);
-                puts(path);
-                stat_change_directory=chdir(path);
-                if(stat_change_directory==0){
-                    printf("change of directory successful");
-                }else{
-                    printf("change of directory unsuccessful");
-                }
+                //printf("%s is the next dir \n", entry->d_name);
                 test_first_dir=1;
             }
         }
@@ -161,8 +175,8 @@ int create_directory(char*path){
     int stat_create_directory=-1;
     int lg_lastdir,lg_path,lg_parentdir;
 
-    char last_dir[STR_MAX_LEN];
-    char parent_dir[STR_MAX_LEN];
+    char *last_dir=malloc(sizeof(char)*STR_MAX_LEN);
+    char *parent_dir=malloc(sizeof(char)*STR_MAX_LEN);
 
     strcpy(last_dir, basename(path));   // On extrait le nom du repertoire a creer
     lg_lastdir=strlen(last_dir);
@@ -175,6 +189,8 @@ int create_directory(char*path){
         stat_change_directory=chdir(parent_dir);
         if(stat_change_directory==0){ //Change of direcctory succesful
             stat_create_directory=mkdir(last_dir, 0777);
+            free(parent_dir);  //On libere la memoire des allocations dynamiquess
+            free(last_dir);
             if ( stat_create_directory== 0) { //Directory created successfully
                 //printf("Directory created successfully\n");
             } else {

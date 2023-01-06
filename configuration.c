@@ -237,8 +237,6 @@ char *check_equal(char *str) {
 
     }
 
-
-
     return str;
 }
 
@@ -251,22 +249,24 @@ char *check_equal(char *str) {
 char *get_word(char *source, char *target) {
     int i=0;
 
-    if(source[0]==' '){ //looks for an optional sequence of spaces at the beginning
-        source=skip_spaces(source);
+    if(source[0]==' '){ //On cherche un ou plusieurs espace au debut
+        source=skip_spaces(source); //On avance au premier char different d'espace
     }
-    while(source[i]!=' '&&source[i]!='\0'){ //
+    while(source[i]!=' '&&source[i]!='\0'){ //On cherche espace a la fin du mot
         i++;
     }
-
-    if(source[i-1]=='\n'){  // si le derniere caractere est un saut de page
+    if(source[i]==' '){ //Si on trouve un espace on stocke le mot sans espace
         strncpy(target,source,i-1);
-
     }else{
-        strncpy(target,source,i);
+
+        if(source[i-1]=='\n'){  // si le derniere caractere est un saut de page
+            strncpy(target,source,i-1);
+
+        }else{
+            strncpy(target,source,i);
+        }
+
     }
-
-
-
     return source;
 }
 
@@ -385,11 +385,9 @@ configuration_t *read_cfg_file(configuration_t *base_configuration, char *path_t
             memset(string,'\0',STR_MAX_LEN);
         }
     }
-    /**
-    else{
+    else{ //Si la chemin au fichier n'existe pas on retourne NULL
         base_configuration=NULL;
     }
-*/
 
     return base_configuration;
 }

@@ -26,6 +26,7 @@
  * @return a pointer to the updated beginning of the list
  */
 sender_t *add_source_to_list(sender_t *list, char *source_email) {
+    //On stocke l'email dans la variable "new"
     sender_t* new = (sender_t*)malloc(sizeof(sender_t));
     strcpy(new->recipient_address,source_email);
     new->head=NULL;
@@ -36,8 +37,8 @@ sender_t *add_source_to_list(sender_t *list, char *source_email) {
     if(list==NULL){
         list=new;
     }else{
-        if (find_source_in_list(list, source_email) == NULL) { //Si on pas trouve l'email dans la liste, on l'ajoute
-            //printf("nouveau sender\n");
+        //Si on pas trouve l'email dans la liste, on l'ajoute a la fin
+        if (find_source_in_list(list, source_email) == NULL) {
             sender_t* p=list;
             while(p->next!=NULL){
                 p=p->next;
@@ -55,13 +56,32 @@ sender_t *add_source_to_list(sender_t *list, char *source_email) {
  * @param list a pointer to the list to clear
  */
 void clear_sources_list(sender_t *list) {
+    //On cherche effacer les tete de la liste de sources
+    while (list->next!=0){//on parcours chaque source
+        //on cherche effacer la tete de la liste des destinataires
 
-    while (list->next!=0){
+        //on remet a 0 les chaines de characteres ie.adresse
         memset(list->recipient_address,'\0',STR_MAX_LEN);
-        free(list->prev);
+
+        while(list->head->next!=0){  //on parcours la liste des destinataires
+
+            //on remet a 0 les chaines de characteres ie.adresse
+            memset(list->head->recipient_address,'\0',STR_MAX_LEN);
+            list->head->occurrences=0;
+            if(list->head->prev!=NULL){ //on libere la memoire de l'adresse du mail precedent
+                free(list->head->prev);
+            }
+            list->head=list->head->next;
+        }
+        free(list->prev);//on libere la memoire de l'adresse du mail precedent au dernier mail recipient
+
+        if(list->prev!=NULL){
+            free(list->prev); //on libere la memoire de l'adresse du mail precedent
+        }
         list=list->next;
+
     }
-    free(list->prev);
+    free(list->prev);//on libere la memoire de l'adresse du mail precedent au dernier mail source
 }
 
 /*!
@@ -71,27 +91,25 @@ void clear_sources_list(sender_t *list) {
  * @return a pointer to the matching source, NULL if none exists
  */
 sender_t *find_source_in_list(sender_t *list, char *source_email) {
-    int test=0;
+    int test_trouve=0;
     if(list==NULL){
         return list;
     }else{
         sender_t* p=list;
-        while(p->next!=NULL&&test==0){
+        while(p->next!=NULL&&test_trouve==0){ //on parcours la liste
+            //Si on le trouve on envoie test_trouve=1
             if(strncmp(p->recipient_address,source_email,strlen(source_email))==0){
-                //puts(p->recipient_address);
-                //puts(source_email);
-                test=1;
+                test_trouve=1;
                 return p;
             }
             p=p->next;
         }
-        if(strcmp(p->recipient_address,source_email)==0){
-            test=1;
+        if(strcmp(p->recipient_address,source_email)==0){ //Si on trouve le mail a la fin, test_trouve=1
+            test_trouve=1;
             return p;
         }
 
-        if(test!=1){
-            //printf("sender pas trouve\n");
+        if(test_trouve!=1){//Sinon on envoie NULL
             return NULL;
         }
 
@@ -108,7 +126,7 @@ sender_t *find_source_in_list(sender_t *list, char *source_email) {
  */
 void add_recipient_to_source(sender_t *source, char *recipient_email) {
     //printf("nouveau recip\n");
-    int test=0;
+    int test_trouve=0;
 
     recipient_t *new=(recipient_t*)malloc(sizeof(recipient_t));
     strcpy(new->recipient_address,recipient_email);
@@ -116,27 +134,23 @@ void add_recipient_to_source(sender_t *source, char *recipient_email) {
     new->prev=NULL;
 
     //Si la liste n'a pas en encore de recipients
-    if(source->head==NULL){ //On l'ajoute au debut
-        //printf("pas de reci et on l'ajoute au recip de %s p\n",source->recipient_address);
+    if(source->head==NULL){ //On l'ajoute au debut;
         new->occurrences=1;
         source->head=new;
         source->tail=new;
     }else{
         //Sinon on cherche le mail
-        //printf("Sinon on cherche le mail\n");
         recipient_t* current_recipient=source->head;
-        while(current_recipient!=NULL&&test==0){
+        while(current_recipient!=NULL&&test_trouve==0){
             if(strcmp(current_recipient->recipient_address,recipient_email)==0){
                 current_recipient->occurrences=current_recipient->occurrences+1;
-                //printf("trouve l'email dans la liste, on incrememte");
-                test=1;
+                test_trouve=1;
             }
             current_recipient=current_recipient->next;
         }
 
         //Si on pas trouve l'email dans la liste, on l'ajoute a la fin
-        if(test==0){
-            //printf("pas trouve l'email dans la liste, on l'ajoute a la fin de %s\n",source->tail->recipient_address);
+        if(test_trouve==0){
             new->occurrences=1;
             new->prev=source->tail;
             source->tail->next=new;
@@ -175,16 +189,11 @@ void files_list_reducer(char *data_source, char *temp_files, char *output_file) 
             struct stat info;
             stat(current_entry->d_name, &info);
             if (strcmp(current_entry->d_name, ".") && strcmp(current_entry->d_name, "..")) {
-                //puts(current_entry->d_name);
                 noms_utilisateurs[it] = malloc(sizeof(char) * strlen(current_entry->d_name));
                 strcpy(noms_utilisateurs[it],current_entry->d_name);
-                //printf("%d",it);
                 it++;
             }
         }
-        //printf("%d",it);
-
-
 
         strcpy(last_dir, basename(output_file));
         stat_change_directory=chdir(temp_files);
@@ -203,26 +212,17 @@ void files_list_reducer(char *data_source, char *temp_files, char *output_file) 
                 }
             }
             fclose(file_output);
-
-
-
         }else{
-            //printf("erreur");
+            //printf("");
         }
-
-
-
-
         for(int i=0;i<it;i++){
-            //puts(noms_utilisateurs[i]);
             free(noms_utilisateurs[i]);
         }
-
         free(noms_utilisateurs);
 
-    }
+    } //Sinon on envoie un message d'erreur
     else{
-        //printf("problem");
+        printf("Repertoires inexistants\n");
     }
     sync_temporary_files(temp_files);
 }
@@ -263,10 +263,11 @@ void files_reducer(char *temp_file, char *output_file) {
             memset(recipient,'\0',STR_MAX_LEN);
         }
     }
+
     affiche_liste(list_of_source_emails);
     // Maintenant on copie, nos resultats dans un fichier
-    char fichier_resultat[STR_MAX_LEN];
-    char parent_dir[STR_MAX_LEN];
+    char *fichier_resultat=malloc(sizeof(char)*STR_MAX_LEN);
+    char *parent_dir=malloc(sizeof(char)*STR_MAX_LEN);
     //On extrait le nom du fichier a creer
     strcpy(fichier_resultat, basename(output_file));
     puts(fichier_resultat);
@@ -275,15 +276,15 @@ void files_reducer(char *temp_file, char *output_file) {
     int lg_path=strlen(output_file);
     int lg_parentdir=lg_path-lg_fichier_resultat;
     strncpy(parent_dir, output_file,lg_parentdir-1);
-    puts(parent_dir);
+
     //On change de repertoire pour creer un fichier dans le repertoire parent qui lui correspond
     if(directory_exists(parent_dir)){
         int stat_change_directory=chdir(parent_dir);
         if(stat_change_directory==0){ //Change of direcctory succesful
             sender_t* p=list_of_source_emails;
             while (p!=NULL){ // On parcours la liste
-                FILE *file_output = fopen(fichier_resultat, "a+");// on ouvre le fichier resultat pour copier la liste des sources avec destinataire
-                fprintf(file_output,"%s ", p->recipient_address);
+                FILE *file_output = fopen(fichier_resultat, "a+");// on ouvre le fichier resultat
+                fprintf(file_output,"%s ", p->recipient_address); //on copie la liste des sources avec destinataire
                 recipient_t* current_recipient=p->head;
                 while(current_recipient!=NULL){  // Tant qu'il aient des  recipients, on les imprime
                     fprintf(file_output,"(%d) %s ", current_recipient->occurrences,current_recipient->recipient_address);
@@ -295,9 +296,11 @@ void files_reducer(char *temp_file, char *output_file) {
             }
         }
     }
+    free(fichier_resultat);
+    free(parent_dir);
 }
 
-void affiche_liste(sender_t* l){
+void affiche_liste(sender_t* l){ //Fonction pas utilise mais algorithme utilise pour imprimer dans le fichier resultat
     if( l==NULL ){
         printf("Liste vide\n");
     }
